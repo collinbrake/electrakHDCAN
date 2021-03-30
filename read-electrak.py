@@ -27,16 +27,25 @@ class RecvMsg:
     def getPGN(self, canID):
         bits = canID
         bits = bits >> 8 # 8 for source address
-        bits = (bits & 0x3FFFF)
+        bits = (bits & 0x3FF00) # mask out the last 8 bits because they form the PDU specific, the destination address in peer-to-peer
+        # see line in benkfra/j1939 in notify function
         #print(bin(bits), len(bin(bits)))
         self.PGN = int(bits)
+
+    def getBits(self, data, dataLength, start, length):
+        offset = dataLength - (start + length) # offset from right
+        mask = 0
+        for i in range(0, length):
+            mask |= 1 << i
+        mask <<= offset
+        bits = (data & mask) >> offset
+        bits = reverse_bit(bits)
+        print(bin(data), bin(mask), bin(bits), int(bits))
+        return bits
+
     
-    def getPosition(self, data):
-        first = data[1]
-        second = data[2]
-        bits  = first << (14-8)
-        bits = bits | second >> 2
-        #bits = reverse_bit(bits)
+    def getPosition(self, data, dataLength, start, length):
+        bits = self.getBits(data, dataLength, start, length)
         bitRange = float(2**14)
         valRange = float(400) # mm
         self.position = float(bits) / bitRange * valRange / 10 / 2.54 # inches
@@ -72,23 +81,23 @@ class RecvMsg:
        
     def getMotionFlag(self, data):
         bits = (data[4] >> 7)
-        self.motion = bits
+        self.motion = bool(bits)
         
     def getOverloadFlag(self, data):
         bits = (data[4] >> 6) & 1
-        self.overload = bits
+        self.overload = bool(bits)
         
 
 def main():
+    msg = RecvMsg()
     while(True):
         bus = can.interface.Bus('can0', bustype='socketcan')
         message = bus.recv()
-        print(message)
+        #print(message)
 
-        msg = RecvMsg()
         msg.getPGN(message.arbitration_id)
-        if msg.PGN == 126975:
-            msg.getPosition(message.data)
+        if msg.PGN == 126720:
+            msg.getPosition(message.data[0] << 8 | message.data[1], 16, 0, 14)
             msg.getCurrent(message.data)
             msg.getSpeed(message.data)
             msg.getVoltageError(message.data)
@@ -97,8 +106,8 @@ def main():
             msg.getOverloadFlag(message.data)
             #print(bin(message.data[0]),bin(message.data[1]))
             #print(bin(msg.position), hex(msg.position), msg.position)
-        print(msg.PGN, msg.position, msg.current, msg.speed)
-        print(msg.voltageError, msg.tempError, msg.motion, msg.overload)
+        print("PGN:", msg.PGN, "POS:", msg.position, "Amp:", msg.current, "SPD:", msg.speed)
+        print("VOE:", msg.voltageError, "TPE:", msg.tempError, "MTN:", msg.motion, "OVL:", msg.overload)
 
         
 
