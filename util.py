@@ -9,4 +9,6 @@ def reverse_bit(num, bitCount):
     while temp:
         result = (result << 1) + (temp & 1)
         temp >>= 1
-    return result << (bitCount - math.ceil(math.log2(num))) # Account for leading zeros
+
+    sigBits =math.ceil(math.log2(num)) 
+    return result << (bitCount - sigBits) # Account for leading zeros
