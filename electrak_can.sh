@@ -10,7 +10,7 @@ bringup_can () {
 
 }
 
-command_actuator () {
+move () {
     POSITION=$1
     DUTY=$2
 
