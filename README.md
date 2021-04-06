@@ -3,6 +3,8 @@ CAN bus interfacing with the Thomson Linear Electrak HD smart actuator.
 
 ## Usage Example
 
+Note, this code is strictly for experimental purposes and has not been extensively tested.
+
 Command actuator to move to 100 mm at 50% speed:
 
 ```shell
