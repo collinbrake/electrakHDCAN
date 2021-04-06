@@ -8,8 +8,8 @@ import electrak
 
 def main():
     bus = can.interface.Bus('can0', bustype='socketcan')
-    afm = electrak.AFM()
-    acm = electrak.ACM(args.position, args.speed)
+    afm = electrak.AFM(args.log)
+    acm = electrak.ACM(args.position, args.speed, args.log)
     
     os.system("clear")
     
@@ -21,21 +21,19 @@ def main():
             
         os.system("clear")
         logEntry = afm.get(feedback)
-        print(logEntry)
-        print("\n")
+        print("RECIEVING --------------------\n", logEntry, "\n")
         
         bus.send(can.Message(arbitration_id = acm.id(), is_extended_id=True, data=acm.getBytes()))
-        print(acm.getBytes())
         pdu, logEntry = acm.log()
-        print(pdu+":\n")
-        print(logEntry)
+        print("SENDING:", pdu, "--------------------\n", logEntry)
         time.sleep(0.1)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--speed", type=int)
-
     parser.add_argument("-p", "--position", type=int)
+    parser.add_argument("-l", "--log", type=bool)
     args = parser.parse_args()
+    
     
     main()

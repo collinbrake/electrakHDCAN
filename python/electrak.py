@@ -4,8 +4,12 @@ from pandas import DataFrame
 
 # Thomson Linear Electrac HD CAN J1939 Actuator Feedback Message Decoder
 class AFM:
-    def __init__(self):
-        self.PGN = 0
+    def __init__(self, logEn=False):
+        
+        # ID
+        self.PGN = 0 # assume there are other ECU's on the bus, no real filtering implimented yet
+
+        # Data
         self.position = 0.0
         self.current = 0.0
         self.speed = 0
@@ -18,6 +22,8 @@ class AFM:
         self.saturation = False
         self.fatalError = False
         
+        # Logging
+        self.logEn = logEn
         self.record = DataFrame({"position" : [],
                               "current" : [],
                               "speed" : [],
@@ -105,6 +111,8 @@ class AFM:
         self.fatalError = bool(bits)
         
     def log(self):
+        
+        
         entry = DataFrame({"position" : [self.position],
                               "current" : [self.current],
                               "speed" : [self.speed],
@@ -118,12 +126,14 @@ class AFM:
                               "fatal error" : [self.fatalError],
                      }, dtype=str)
             
-        self.record = self.record.append(entry, ignore_index=False)
+        if self.logEn:
+            self.record = self.record.append(entry, ignore_index=False)
+
         return entry
         
 # Thomson Linear Electrac HD CAN J1939 Actuator Control Message Encoder
 class ACM:
-    def __init__(self, pos, spd):
+    def __init__(self, pos, spd, logEn=False):
         
         # ID
         self.pgn = 61184
@@ -137,15 +147,17 @@ class ACM:
         self.motionEn = True
         
         # Logging
+        self.logEn = logEn
         self.record = DataFrame({"position" : [],
                               "current limit" : [],
                               "speed" : [],
                               "motion enable" : [],
                      }, dtype=str)
-        self.logPath = "electrakhd_can_send" +time.strftime("%Y-%m-%d_%Hh%Mm%Ss", time.gmtime())
+        self.logPath = "electrakhd_can_send_" +time.strftime("%Y-%m-%d_%Hh%Mm%Ss", time.gmtime())
 
         # Dump of raw PDU's
-        self.dump = open(self.logPath + ".txt", "w")
+        if self.logEn:
+            self.dump = open(self.logPath + ".txt", "w")
     
     def id(self):
         return (6 << 26) | (self.pgn << 8) | self.destAddr << 8 | self.srcAddr
@@ -168,7 +180,6 @@ class ACM:
         data1 = reverse_bit((reverse_bit(self.positionScaled(), 14) << 2 | reverse_bit(self.currentLimScaled(), 9) >> 7) & 0xFF, 8)
         data2 = reverse_bit((reverse_bit(self.currentLimScaled(), 9) << 1 | reverse_bit(self.speedScaled(), 5) >> 4) & 0xFF, 8)
         data3 = reverse_bit((reverse_bit(self.speedScaled(), 5) << 4 | self.motionEnInt() << 3) & 0xFF, 8)
-        print(bin(reverse_bit(data3, 8)))
         
         data[0] = data0 & 0xFF
         data[1] = data1 & 0xFF
@@ -178,14 +189,16 @@ class ACM:
         return data
     
     def log(self):
-
+        
         bytesStr = ""
         data = self.getBytes()
         for b in data:
             bytesStr += hex(b)[2:] + " "
 
         pdu = str(hex(self.id()))[2:] + " [" + str(len(data)) + "] " +  bytesStr
-        self.dump.write(pdu)
+
+        if self.logEn:
+            self.dump.write(pdu+"\n")
         
         entry = DataFrame({"position" : [self.position],
                               "current limit" : [self.currentLim],
@@ -193,6 +206,8 @@ class ACM:
                               "motion enable" : [self.motionEn],
                      }, dtype=str)
             
-        self.record = self.record.append(entry, ignore_index=False)
+        if self.logEn:
+            self.record = self.record.append(entry, ignore_index=False)
+
         return pdu, entry
 
