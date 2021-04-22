@@ -1,13 +1,22 @@
 import time
-from util import reverse_bit
+from datetime import datetime
+import can
+import os
+import argparse
+import math
 from pandas import DataFrame
+
+from util import reverse_bit
 
 # Thomson Linear Electrac HD CAN J1939 Actuator Feedback Message Decoder
 class AFM:
-    def __init__(self, logEn=False):
+    def __init__(self):
         
         # ID
         self.PGN = 0 # assume there are other ECU's on the bus, no real filtering implimented yet
+        
+        # Flag stating that this entry is valid
+        self.valid = False
 
         # Data
         self.position = 0.0
@@ -22,21 +31,8 @@ class AFM:
         self.saturation = False
         self.fatalError = False
         
-        # Logging
-        self.logEn = logEn
-        self.record = DataFrame({"position" : [],
-                              "current" : [],
-                              "speed" : [],
-                              "voltage error" : [],
-                              "temp error" : [],
-                              "motion" : [],
-                              "overload" : [],
-                              "back drive" : [],
-                              "parameter" : [],
-                              "saturation" : [],
-                              "fatal error" : [],
-                     }, dtype=str)
-        self.logPath = "electrakhd_can_recv" +time.strftime("%Y-%m-%d_%Hh%Mm%Ss", time.gmtime()) + ".csv"
+    def reset(self):
+        self = AFM()
         
     def get(self, message):
         self.getPGN(message.arbitration_id)
@@ -47,9 +43,9 @@ class AFM:
             self.getParameter(message.data[4], None, 3, 1)
             self.getSaturation(message.data[4], None, 4, 1)
             self.getFatalError(message.data[4], None, 5, 1)
+        else:
+            self.reset()
             
-        return self.log()
-    
     def getPGN(self, canID):
         bits = canID
         bits = bits >> 8
@@ -110,30 +106,9 @@ class AFM:
         bits = self.getBits(data1, data2, 2, 1, length)
         self.fatalError = bool(bits)
         
-    def log(self):
-        
-        
-        entry = DataFrame({"position" : [self.position],
-                              "current" : [self.current],
-                              "speed" : [self.speed],
-                              "voltage error" : [self.voltageError],
-                              "temp error" : [self.tempError],
-                              "motion" : [self.motion],
-                              "overload" : [self.overload], 
-                              "back drive" : [self.backdrive],
-                              "parameter" : [self.parameter],
-                              "saturation" : [self.saturation],
-                              "fatal error" : [self.fatalError],
-                     }, dtype=str)
-            
-        if self.logEn:
-            self.record = self.record.append(entry, ignore_index=False)
-
-        return entry
-        
 # Thomson Linear Electrac HD CAN J1939 Actuator Control Message Encoder
 class ACM:
-    def __init__(self, pos, spd, logEn=False):
+    def __init__(self, pos, speed):
         
         # ID
         self.pgn = 61184
@@ -141,24 +116,11 @@ class ACM:
         self.srcAddr = 0 # random
 
         # Data
-        self.position = int(pos)
+        self.position = pos
         self.currentLim = 10
-        self.speed = int(spd)
+        self.speed = speed
         self.motionEn = True
         
-        # Logging
-        self.logEn = logEn
-        self.record = DataFrame({"position" : [],
-                              "current limit" : [],
-                              "speed" : [],
-                              "motion enable" : [],
-                     }, dtype=str)
-        self.logPath = "electrakhd_can_send_" +time.strftime("%Y-%m-%d_%Hh%Mm%Ss", time.gmtime())
-
-        # Dump of raw PDU's
-        if self.logEn:
-            self.dump = open(self.logPath + ".txt", "w")
-    
     def id(self):
         return (6 << 26) | (self.pgn << 8) | self.destAddr << 8 | self.srcAddr
     
@@ -187,27 +149,149 @@ class ACM:
         data[3] = data3 & 0xFF
 
         return data
-    
-    def log(self):
-        
-        bytesStr = ""
-        data = self.getBytes()
-        for b in data:
-            bytesStr += hex(b)[2:] + " "
-
-        pdu = str(hex(self.id()))[2:] + " [" + str(len(data)) + "] " +  bytesStr
+class ActuatorManager:
+    def __init__(self, logEn=True):
+        self.logEn = logEn
 
         if self.logEn:
-            self.dump.write(pdu+"\n")
+            self.binaryLog = DataFrame({"C ID" : [],
+                                        "C B1" : [],
+                                        "C B2" : [],
+                                        "C B3" : [],
+                                        "C B4" : [],
+                                        "C B5" : [],
+                                        "C B6" : [],
+                                        "C B7" : [],
+                                        "C B8" : [],
+
+                                        "F ID" : [],
+                                        "F B1" : [],
+                                        "F B2" : [],
+                                        "F B3" : [],
+                                        "F B4" : [],
+                                        "F B5" : [],
+                                        "F B6" : [],
+                                        "F B7" : [],
+                                        "F B8" : [],
+                                }, dtype=str)
+            self.valueLog = DataFrame({ "time" : [],
+                                    "C position" : [],
+                                    "C speed" : [],
+                                    "C current max" : [],
+                                    
+                                    "F position" : [],
+                                    "F speed" : [],
+                                    "F current" : [],
+                                    "F voltage err" : [],
+                                    "F temp err" : [],
+                                    "F motion" : [],
+                                    "F overload" : [],
+                                    "F backdrive" : [],
+                                    "F backdrive" : [],
+                                    "F parameter" : [],
+                                    "F saturation" : [],
+                                    "F fatal err" : [],
+                            }, columns = ["time",
+                                    "C position",
+                                    "C speed",
+                                    "C current max",
+                                    "F position",
+                                    "F speed",
+                                    "F current",
+                                    "F voltage err",
+                                    "F temp err",
+                                    "F motion",
+                                    "F overload",
+                                    "F backdrive",
+                                    "F parameter",
+                                    "F saturation",
+                                    "F fatal err"], dtype=str)
         
-        entry = DataFrame({"position" : [self.position],
-                              "current limit" : [self.currentLim],
-                              "speed" : [self.speed],
-                              "motion enable" : [self.motionEn],
-                     }, dtype=str)
+            timeStr = time.strftime("%Y-%m-%d_%Hh%Mm%Ss", time.gmtime()) 
+            self.valueLogPath = "electrakhd_can_data_fields_" + timeStr + ".csv"
+            self.binaryLogPath = "electrakhd_can_bytes_" + timeStr + ".csv"
+
+        self.afm = AFM()
+        self.acm = ACM(0, 0)
+        self.t_0 = datetime.now()
+        
+    def bringupCAN(self, port="/dev/ttyACM0", iface="can0"):
+        self.port = port
+        self.iface = iface
+        
+        # Bringup can interface
+        # TODO add exceptions and perhaps retry
+        os.system("sudo slcand -o -c -s5 " + port + " " + iface)
+        os.system("sudo ifconfig can0 up")
+        os.system("sudo ifconfig can0 txqueuelen 1000")
+        self.bus = can.interface.Bus(iface, bustype='socketcan')
+        
+    # interface is responsible for sending and recieving exactly one message with the
+    # actuator. The value log is returned. The sent message is given as a function arguments.
+    # If logging is enabled it will log the messages both in binary and decoded form.
+    def interface(self, acm):
+        
+        feedback = self.bus.recv(0.1)
+        if feedback:
+            self.afm.get(feedback)
+        else:
+            self.afm.reset()
+
+        self.acm = acm
+        data = self.acm.getBytes()
+        self.bus.send(can.Message(arbitration_id=self.acm.id(), is_extended_id=True, data=data))
+        
+        binaryLogEntry = DataFrame({"C ID" : [self.acm.id()],
+                                        "C B1" : [data[0]],
+                                        "C B2" : [data[1]],
+                                        "C B3" : [data[2]],
+                                        "C B4" : [data[3]],
+                                        "C B5" : [data[4]],
+                                        "C B6" : [data[5]],
+                                        "C B7" : [data[6]],
+                                        "C B8" : [data[7]],
+                                }, dtype=str)
+
+        valueLogEntry = DataFrame({ "time" : [(datetime.now() - self.t_0).total_seconds()],
+                                    "C position" : [self.acm.position],
+                                    "C speed" : [self.acm.speed],
+                                    "C current max" : [self.acm.currentLim],
+                                    
+                                    "F position" :  [self.afm.position],
+                                    "F speed" :     [self.afm.speed],
+                                    "F current" :   [self.afm.current],
+                                    "F voltage err" : [self.afm.voltageError],
+                                    "F temp err" : [self.afm.tempError],
+                                    "F motion" : [self.afm.motion],
+                                    "F overload" : [self.afm.overload],
+                                    "F backdrive" : [self.afm.backdrive],
+                                    "F parameter" : [self.afm.parameter],
+                                    "F saturation" : [self.afm.saturation],
+                                    "F fatal err" : [self.afm.fatalError],
+                            }, columns = ["time",
+                                    "C position",
+                                    "C speed",
+                                    "C current max",
+                                    "F position",
+                                    "F speed",
+                                    "F current",
+                                    "F voltage err",
+                                    "F temp err",
+                                    "F motion",
+                                    "F overload",
+                                    "F backdrive",
+                                    "F parameter",
+                                    "F saturation",
+                                    "F fatal err"], dtype=str)
             
+        self.valueLog = self.valueLog.append(valueLogEntry, ignore_index=True)
+        self.binaryLog = self.binaryLog.append(binaryLogEntry, ignore_index=True)
+        
+        return valueLogEntry
+        
+    def saveLogs(self):
         if self.logEn:
-            self.record = self.record.append(entry, ignore_index=False)
-
-        return pdu, entry
-
+            if not os.path.exists("log/"):
+                os.system("mkdir log/")
+            self.valueLog.to_csv("log/" + self.valueLogPath)
+            self.binaryLog.to_csv("log/" + self.binaryLogPath)

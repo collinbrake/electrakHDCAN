@@ -3,12 +3,36 @@ CAN bus interfacing with the Thomson Linear Electrak HD smart actuator.
 
 ## Usage Example
 
+### Go To Position
+
 Command actuator to move to 100 mm at 50% speed:
 
 ```shell
 $ . electrak_can.sh
 $ move 100 50
 ```
+
+### Sinusoidal
+
+**Future functionality** that will move the actuator from limit to limit repetitiously at the specified speed.
+
+```shell
+$ sinusoid 50
+```
+
+## Logging
+
+The core functionality of this library is to move the software interface with the Electrak HD actuator up one abstraction by handling both the J1939 protocol and the data format specified by the manufacturer, Thomson Linear. The logging will consist of two levels:
+
+1. Logging of the address and data fields sent (before encoding) and received (after decoding)
+2. Logging of the address and data raw bits sent (after encoding) and received (before decoding)
+
+These two categories are logged in two different CSV files, both in the `log/` directory which is created at the root of the repository if it does not exist. Timestamps are logged with each entry in both files, and will exactly correspond for correlating entries between the files.
+
+Notes:
+
+- Data values from the sent commands (ACM's) have column headings starting with a "C" character
+- Data values from the sent commands (AFM's) have column headings starting with a "F" character
 
 ## Electrak HD CAN Bus Interfacing
 
