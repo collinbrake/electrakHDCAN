@@ -5,20 +5,27 @@ CAN bus interfacing with the Thomson Linear Electrak HD smart actuator.
 
 Note, this code is a first prototype for experimentation and has not been extensively tested.
 
-Command actuator to move to 100 mm at 50% speed:
+Command actuator to move to 250 mm at 100% speed:
 
 ```shell
-$ . electrak_can.sh
-$ move 100 50
+$ python3 python/gotoposition.py -p /dev/ttyACM10 -s 100 -l 250
 ```
+
+The following plot shows data from a run like this:
+
+![](/home/collin/electrakHDCAN/plot.png)
 
 ### Sinusoidal
 
-**Future functionality** that will move the actuator from limit to limit repetitiously at the specified speed.
+Move the actuator from limit to limit repetitiously at 50% speed.
 
 ```shell
-$ sinusoid 50
+$ python3 python/sinusiodal.py -p /dev/ttyACM10 -s 50                      
 ```
+
+There is no closed-loop control implemented. As can be seen, the position signal is very noisy, and no filtering is used at this point.
+
+![](/home/collin/electrakHDCAN/plot_sinusoidal.png)
 
 ## Logging
 
@@ -49,7 +56,7 @@ Here is a list of the sources used:
 
 - Page 22 of the actuator manual specifies the use of the Proprietary A2 PGN, and on page 24 defines its use for feedback messages.
 
-  - The book provides a comprehensive specification of this PGN on page 67.
+  - The book provides a specification of this PGN on page 67.
   - It is a peer-to-peer message, or PDU1 format
 
 - **Decoding the 29-bit ID**
@@ -89,6 +96,8 @@ Here is a list of the sources used:
     | --------- | -------- | ----- | ---- | ---- | ---------- | ------------ | ------------ |
     | **Value** | 6        | 61184 | 0    | 0    | 239        | 19           | Anything?    |
 
-  - The PDU specific is the destination address in peer-to-peer communication.
+  - Reverse the packed bytes before they are sent out
 
+  - The PDU specific is the destination address in peer-to-peer communication.
+  
     - Same as the source address from the AFM

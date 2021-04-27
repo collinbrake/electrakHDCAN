@@ -31,18 +31,25 @@ class AFM:
         self.saturation = False
         self.fatalError = False
         
+        # Byte array to hold input data
+        self.id = []
+        self.data = [0, 0, 0, 0, 0, 0, 0, 0]
+        
     def reset(self):
         self = AFM()
         
     def get(self, message):
+        self.id = message.arbitration_id
+        self.data = message.data
         self.getPGN(message.arbitration_id)
         if self.PGN == 126720:
-            self.getPosition(message.data[0], message.data[1], 0, 14)
-            self.getCurrent(message.data[1], message.data[2], 6, 9)
-            self.getBackdrive(message.data[4], None, 2, 1)
-            self.getParameter(message.data[4], None, 3, 1)
-            self.getSaturation(message.data[4], None, 4, 1)
-            self.getFatalError(message.data[4], None, 5, 1)
+            self.getPosition(message.data[0], message.data[1], 14)
+            self.getCurrent(message.data[1], message.data[2], 9)
+            self.getSpeed(message.data[2], message.data[3], 5)
+            self.getBackdrive(message.data[4], None, 1)
+            self.getParameter(message.data[4], None, 1)
+            self.getSaturation(message.data[4], None, 1)
+            self.getFatalError(message.data[4], None, 1)
         else:
             self.reset()
             
@@ -62,47 +69,47 @@ class AFM:
         bits = reverse_bit((data >> shft) & mask, length) # this line is to account for reverse bit order specified in electrak manual
         return bits
     
-    def getPosition(self, data1, data2, start, length):
+    def getPosition(self, data1, data2, length):
         bits = self.getBits(data1, data2, 2, 0x3FFF, length)
         self.position = bits * 0.1 # 0.1mm/bit
         
-    def getCurrent(self, data1, data2, start, length):
+    def getCurrent(self, data1, data2, length):
         bits = self.getBits(data1, data2, 1, 0x1FF, length)
         self.current = bits * 0.1 # 0.1A/bit
         
-    def getSpeed(self, data1, data2, start, length):
+    def getSpeed(self, data1, data2, length):
         bits = self.getBits(data1, data2, 4, 0x1F, length)
         self.speed = bits * 5 # 5%/bit
         
-    def getVoltageError(self, data1, data2, start, length):
+    def getVoltageError(self, data1, data2, length):
         bits = self.getBits(data1, data2, 2, 0x3, length)
         self.voltageError = int(bits)   
         
-    def getTempError(self, data1, data2, start, length):
+    def getTempError(self, data1, data2, length):
         bits = self.getBits(data1, data2, 0, 0x3, length)
         self.tempError = int(bits)
        
-    def getMotion(self, data1, data2, start, length):
+    def getMotion(self, data1, data2, length):
         bits = self.getBits(data1, data2, 7, 1, length)
         self.motion = bool(bits)
         
-    def getOverload(self, data1, data2, start, length):
+    def getOverload(self, data1, data2, length):
         bits = self.getBits(data1, data2, 6, 1, length)
         self.overload = bool(bits)
         
-    def getBackdrive(self, data1, data2, start, length):
+    def getBackdrive(self, data1, data2, length):
         bits = self.getBits(data1, data2, 5, 1, length)
         self.backdrive = bool(bits)
         
-    def getParameter(self, data1, data2, start, length):
+    def getParameter(self, data1, data2, length):
         bits = self.getBits(data1, data2, 4, 1, length)
         self.parameter = bool(bits)
 
-    def getSaturation(self, data1, data2, start, length):
+    def getSaturation(self, data1, data2, length):
         bits = self.getBits(data1, data2, 3, 1, length)
         self.saturation = bool(bits)
 
-    def getFatalError(self, data1, data2, start, length):
+    def getFatalError(self, data1, data2, length):
         bits = self.getBits(data1, data2, 2, 1, length)
         self.fatalError = bool(bits)
         
@@ -147,8 +154,11 @@ class ACM:
         data[1] = data1 & 0xFF
         data[2] = data2 & 0xFF
         data[3] = data3 & 0xFF
+        
+        # TODO set all other to 255?
 
         return data
+    
 class ActuatorManager:
     def __init__(self, logEn=True):
         self.logEn = logEn
@@ -173,7 +183,27 @@ class ActuatorManager:
                                         "F B6" : [],
                                         "F B7" : [],
                                         "F B8" : [],
-                                }, dtype=str)
+                                }, columns = ["C ID",
+                                              "C B1",
+                                              "C B2",
+                                              "C B3",
+                                              "C B4",
+                                              "C B5",
+                                              "C B6",
+                                              "C B7",
+                                              "C B8",
+                                              
+                                              "F ID",
+                                              "F B1",
+                                              "F B2",
+                                              "F B3",
+                                              "F B4",
+                                              "F B5",
+                                              "F B6",
+                                              "F B7",
+                                              "F B8",
+                                              ], dtype=str)
+            
             self.valueLog = DataFrame({ "time" : [],
                                     "C position" : [],
                                     "C speed" : [],
@@ -250,7 +280,37 @@ class ActuatorManager:
                                         "C B6" : [data[5]],
                                         "C B7" : [data[6]],
                                         "C B8" : [data[7]],
-                                }, dtype=str)
+                                        
+                                        "F ID" : [self.afm.id],
+                                        "F B1" : [self.afm.data[0]],
+                                        "F B2" : [self.afm.data[1]],
+                                        "F B3" : [self.afm.data[2]],
+                                        "F B4" : [self.afm.data[3]],
+                                        "F B5" : [self.afm.data[4]],
+                                        "F B6" : [self.afm.data[5]],
+                                        "F B7" : [self.afm.data[6]],
+                                        "F B8" : [self.afm.data[7]],
+
+                                }, columns = ["C ID",
+                                              "C B1",
+                                              "C B2",
+                                              "C B3",
+                                              "C B4",
+                                              "C B5",
+                                              "C B6",
+                                              "C B7",
+                                              "C B8",
+                                              
+                                              "F ID",
+                                              "F B1",
+                                              "F B2",
+                                              "F B3",
+                                              "F B4",
+                                              "F B5",
+                                              "F B6",
+                                              "F B7",
+                                              "F B8",
+                                              ], dtype=str)
 
         valueLogEntry = DataFrame({ "time" : [(datetime.now() - self.t_0).total_seconds()],
                                     "C position" : [self.acm.position],
