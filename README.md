@@ -13,7 +13,7 @@ $ python3 python/gotoposition.py -p /dev/ttyACM10 -s 100 -l 250
 
 The following plot shows data from a run like this:
 
-![](/home/collin/electrakHDCAN/plot.png)
+![](plot.png)
 
 ### Sinusoidal
 
@@ -25,7 +25,7 @@ $ python3 python/sinusiodal.py -p /dev/ttyACM10 -s 50
 
 There is no closed-loop control implemented. As can be seen, the position signal is very noisy, and no filtering is used at this point.
 
-![](/home/collin/electrakHDCAN/plot_sinusoidal.png)
+![](plot_sinusoidal.png)
 
 ## Logging
 
