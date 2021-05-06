@@ -24,9 +24,9 @@ def main():
     while(True):
 
         t = (datetime.now() - t_0).total_seconds() # time in seconds since start
-        T = 24 # period, seconds
+        T = 20 # period, seconds
         omega = 1/T *2 * math.pi # frequency, radians per second
-        pos = 100*math.sin(omega * t) + 100
+        pos = 175*math.sin(omega * t) + 175
 
         valueLogEntry = ecu.interface(electrak.ACM(pos, args.speed))
         os.system("clear")
