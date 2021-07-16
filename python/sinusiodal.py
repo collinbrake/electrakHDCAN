@@ -26,12 +26,12 @@ def main():
         t = (datetime.now() - t_0).total_seconds() # time in seconds since start
         T = 20 # period, seconds
         omega = 1/T *2 * math.pi # frequency, radians per second
-        pos = 175*math.sin(omega * t) + 175
+        pos = 150*math.sin(omega * t) + 175
 
         valueLogEntry = ecu.interface(electrak.ACM(pos, args.speed))
         os.system("clear")
         print("RECIEVING---------\n", valueLogEntry)
-        time.sleep(0.1)
+        #time.sleep(0.1)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
