@@ -3,12 +3,28 @@ CAN bus interfacing with the Thomson Linear Electrak HD smart actuator.
 
 ## Usage Example
 
+Install the required Python packages first:
+
+```shell
+$ python3 -m venv .venv
+$ .venv/bin/pip install -r requirements.txt
+```
+
 Note, this code is a first prototype for experimentation and has not been extensively tested.
 
-Command actuator to move to 250 mm at 100% speed:
+Command actuator to move to 250 mm at 100% speed with a serial CAN adapter:
 
 ```shell
 $ python3 python/gotoposition.py -p /dev/ttyACM10 -s 100 -l 250
+```
+
+Run the command-line tool against a virtual CAN network:
+
+```shell
+$ sudo modprobe vcan
+$ sudo ip link add dev vcan0 type vcan
+$ sudo ip link set vcan0 up
+$ .venv/bin/python python/run.py -c vcan0 -s 100 -l 250 --count 10 --no-clear
 ```
 
 The following plot shows data from a run like this:
@@ -40,6 +56,13 @@ Notes:
 
 - Data values from the sent commands (ACM's) have column headings starting with a "C" character
 - Data values from the sent commands (AFM's) have column headings starting with a "F" character
+
+The helper shell script can also bring up a virtual CAN interface and run the command-line tool:
+
+```shell
+$ ./electrak_can.sh vcan vcan0
+$ ./electrak_can.sh move 250 100 vcan0
+```
 
 ## Electrak HD CAN Bus Interfacing
 

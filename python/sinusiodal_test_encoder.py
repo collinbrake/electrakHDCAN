@@ -49,8 +49,13 @@ def main():
     position = Read_Linear_Encoder(130, 972)
     #position.init_serial(serial)
 
-    ecu = electrak.ActuatorManager(position_checker=position)
-    ecu.bringupCAN(port=args.port)
+    ecu = electrak.ActuatorManager()
+    ecu.bringupCAN(
+        port=args.port,
+        iface=args.channel,
+        interface=args.interface,
+        bringup=bool(args.port),
+    )
 
     def signalHandler(sig, frame):
         ecu.saveLogs()
@@ -78,6 +83,8 @@ def main():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", type=str)
+    parser.add_argument("-c", "--channel", type=str, default="can0")
+    parser.add_argument("-i", "--interface", type=str, default="socketcan")
     parser.add_argument("-s", "--speed", type=int, default=50)
     args = parser.parse_args()
     

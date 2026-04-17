@@ -2,8 +2,7 @@ import time
 from datetime import datetime
 import can
 import os
-import argparse
-import math
+import subprocess
 from pandas import DataFrame
 
 from util import reverse_bit
@@ -11,14 +10,13 @@ from util import reverse_bit
 # Thomson Linear Electrac HD CAN J1939 Actuator Feedback Message Decoder
 class AFM:
     def __init__(self):
+        self.id = []
+        self.data = [0, 0, 0, 0, 0, 0, 0, 0]
+        self.reset()
         
-        # ID
-        self.PGN = 0 # assume there are other ECU's on the bus, no real filtering implimented yet
-        
-        # Flag stating that this entry is valid
+    def reset(self):
+        self.PGN = 0
         self.valid = False
-
-        # Data
         self.position = 0.0
         self.current = 0.0
         self.speed = 0
@@ -30,13 +28,8 @@ class AFM:
         self.parameter = False
         self.saturation = False
         self.fatalError = False
-        
-        # Byte array to hold input data
         self.id = []
         self.data = [0, 0, 0, 0, 0, 0, 0, 0]
-        
-    def reset(self):
-        self = AFM()
         
     def get(self, message):
         self.id = message.arbitration_id
@@ -63,7 +56,7 @@ class AFM:
         
         # Get the complete set of input bits reverse bit order to account for CAN protocol
         data = reverse_bit(data1, 8)
-        if data2 != None:
+        if data2 is not None:
             data = data << 8 | reverse_bit(data2, 8)
 
         bits = reverse_bit((data >> shft) & mask, length) # this line is to account for reverse bit order specified in electrak manual
@@ -217,7 +210,6 @@ class ActuatorManager:
                                     "F motion" : [],
                                     "F overload" : [],
                                     "F backdrive" : [],
-                                    "F backdrive" : [],
                                     "F parameter" : [],
                                     "F saturation" : [],
                                     "F fatal err" : [],
@@ -245,16 +237,23 @@ class ActuatorManager:
         self.acm = ACM(0, 0)
         self.t_0 = datetime.now()
         
-    def bringupCAN(self, port="/dev/ttyACM0", iface="can0"):
+    def bringupCAN(self, port=None, iface="can0", interface="socketcan", bringup=None):
         self.port = port
         self.iface = iface
+        self.interfaceType = interface
+
+        if bringup is None:
+            bringup = port is not None
         
-        # Bringup can interface
-        # TODO add exceptions and perhaps retry
-        os.system("sudo slcand -o -c -s5 " + port + " " + iface)
-        os.system("sudo ifconfig can0 up")
-        os.system("sudo ifconfig can0 txqueuelen 1000")
-        self.bus = can.interface.Bus(iface, bustype='socketcan')
+        if bringup:
+            if port is None:
+                raise ValueError("A serial CAN adapter port is required when bringup=True")
+
+            subprocess.run(["sudo", "slcand", "-o", "-c", "-s5", port, iface], check=True)
+            subprocess.run(["sudo", "ip", "link", "set", iface, "up"], check=True)
+            subprocess.run(["sudo", "ip", "link", "set", iface, "txqueuelen", "1000"], check=True)
+
+        self.bus = can.Bus(interface=interface, channel=iface)
         
     # interface is responsible for sending and recieving exactly one message with the
     # actuator. The value log is returned. The sent message is given as a function arguments.
@@ -344,8 +343,9 @@ class ActuatorManager:
                                     "F saturation",
                                     "F fatal err"], dtype=str)
             
-        self.valueLog = self.valueLog.append(valueLogEntry, ignore_index=True)
-        self.binaryLog = self.binaryLog.append(binaryLogEntry, ignore_index=True)
+        if self.logEn:
+            self.valueLog.loc[len(self.valueLog)] = valueLogEntry.iloc[0].to_dict()
+            self.binaryLog.loc[len(self.binaryLog)] = binaryLogEntry.iloc[0].to_dict()
         
         return valueLogEntry
         
@@ -355,3 +355,7 @@ class ActuatorManager:
                 os.system("mkdir log/")
             self.valueLog.to_csv("log/" + self.valueLogPath)
             self.binaryLog.to_csv("log/" + self.binaryLogPath)
+
+    def shutdown(self):
+        if hasattr(self, "bus"):
+            self.bus.shutdown()
