@@ -43,6 +43,51 @@ There is no closed-loop control implemented. As can be seen, the position signal
 
 ![](plot_sinusoidal.png)
 
+## Joystick to Actuator
+
+`joystick_To_Actuator.py` reads an analog joystick via I2C ADC and drives the actuator in real time. The X axis of the joystick is mapped to a target position (0–250 mm) and sent to the actuator at a fixed 30% speed.
+
+### Hardware requirements
+
+- Raspberry Pi (or compatible SBC) with I2C enabled
+- PCF8591 or ADS7830 ADC module (auto-detected at I2C address `0x48` or `0x4B`)
+- Analog joystick connected to ADC channel 1 (X axis)
+- CAN interface already initialized as `can0` (e.g. via a PEAK PCAN USB adapter or `ip link add`)
+
+### Additional Python dependencies
+
+`gpiozero` is available via pip. `ADCDevice` is a Freenove library not published on PyPI — download it directly into the repo root:
+
+```shell
+$ .venv/bin/pip install gpiozero
+$ curl -o ADCDevice.py https://raw.githubusercontent.com/Freenove/Freenove_Ultimate_Starter_Kit_for_Raspberry_Pi/master/Code/Python_GPIOZero_Code/16.1.1_Voltmeter/ADCDevice.py
+```
+
+### Bring up the CAN interface
+
+If `can0` is not already up, initialize it first. For a PEAK PCAN USB adapter:
+
+```shell
+$ sudo ip link set can0 type can bitrate 250000
+$ sudo ip link set can0 up
+```
+
+Or for a virtual interface during development:
+
+```shell
+$ sudo modprobe vcan
+$ sudo ip link add dev can0 type vcan
+$ sudo ip link set can0 up
+```
+
+### Run
+
+```shell
+$ .venv/bin/python joystick_To_Actuator.py
+```
+
+Move the joystick X axis to change the target position. Press `Ctrl+C` to stop; logs are saved automatically to the `log/` directory.
+
 ## Logging
 
 The core functionality of this library is to move the software interface with the Electrak HD actuator up one abstraction by handling both the J1939 protocol and the data format specified by the manufacturer, Thomson Linear. The logging will consist of two levels:

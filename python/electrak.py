@@ -138,15 +138,18 @@ class ACM:
     
     def getBytes(self):
         data = bytearray([0, 0, 0, 0, 0, 0, 0, 0])
-        data0 = reverse_bit((reverse_bit(self.positionScaled(), 14) >> 6) & 0xFF, 8)
-        data1 = reverse_bit((reverse_bit(self.positionScaled(), 14) << 2 | reverse_bit(self.currentLimScaled(), 9) >> 7) & 0xFF, 8)
-        data2 = reverse_bit((reverse_bit(self.currentLimScaled(), 9) << 1 | reverse_bit(self.speedScaled(), 5) >> 4) & 0xFF, 8)
-        data3 = reverse_bit((reverse_bit(self.speedScaled(), 5) << 4 | self.motionEnInt() << 3) & 0xFF, 8)
-        
-        data[0] = data0 & 0xFF
-        data[1] = data1 & 0xFF
-        data[2] = data2 & 0xFF
-        data[3] = data3 & 0xFF
+        pos = self.positionScaled()     # 14-bit, starts at bit 0
+        cur = self.currentLimScaled()   #  9-bit, starts at bit 14
+        spd = self.speedScaled()        #  5-bit, starts at bit 23
+        mot = self.motionEnInt()        #  1-bit, starts at bit 28
+
+        # Pack fields as a plain little-endian 32-bit word.
+        combined = (pos & 0x3FFF) | ((cur & 0x1FF) << 14) | ((spd & 0x1F) << 23) | (mot << 28)
+
+        data[0] = (combined) & 0xFF
+        data[1] = (combined >> 8) & 0xFF
+        data[2] = (combined >> 16) & 0xFF
+        data[3] = (combined >> 24) & 0xFF
         
         # TODO set all other to 255?
 
