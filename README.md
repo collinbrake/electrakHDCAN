@@ -12,10 +12,10 @@ $ .venv/bin/pip install -r requirements.txt
 
 Note, this code is a first prototype for experimentation and has not been extensively tested.
 
-Command actuator to move to 250 mm at 100% speed with a serial CAN adapter:
+Command actuator to move to 250 mm at 100% speed with a PEAK Systems PCAN USB adapter providing a CAN interface at can0:
 
 ```shell
-$ python3 python/gotoposition.py -p /dev/ttyACM10 -s 100 -l 250
+ .venv/bin/python python/run.py -c can0 -s 100 -l 250 --count 100 --no-clear
 ```
 
 Run the command-line tool against a virtual CAN network:
