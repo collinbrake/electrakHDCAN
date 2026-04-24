@@ -83,7 +83,7 @@ $ sudo ip link set can0 up
 ### Run
 
 ```shell
-$ .venv/bin/python joystick_To_Actuator.py
+$ python3 joystick_To_Actuator.py
 ```
 
 Move the joystick X axis to change the target position. Press `Ctrl+C` to stop; logs are saved automatically to the `log/` directory.

@@ -112,7 +112,7 @@ class ACM:
         
         # ID
         self.pgn = 61184
-        self.destAddr = 19
+        self.destAddr = 35
         self.srcAddr = 0 # random
 
         # Data
